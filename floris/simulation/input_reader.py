@@ -231,17 +231,17 @@ class InputReader():
         
         return farm
 
-        def _floris_python(self, json_dict):
-            turbine = self._build_turbine(json_dict["turbine"])
-            wake = self._build_wake(json_dict["wake"])
-            farm = self._build_farm(json_dict["farm"], turbine, wake)
+    def _floris_python(self, json_dict):
+        turbine = self._build_turbine(json_dict["turbine"])
+        wake = self._build_wake(json_dict["wake"])
+        farm = self._build_farm(json_dict["farm"], turbine, wake)
 
-            return farm
+        return farm
 
-        def _floris_julia(self, json_dict):
-            # Develop methods for julia code
-            pass
+    def _floris_julia(self, json_dict):
+        # Develop methods for julia code
+        pass
 
-        def _floris_openMDAO(self, json_dict):
-            # Emulate openMDAO wrappers from plant_energy
-            pass
+    def _floris_openMDAO(self, json_dict):
+        # Emulate openMDAO wrappers from plant_energy
+        pass
