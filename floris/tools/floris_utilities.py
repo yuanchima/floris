@@ -23,9 +23,15 @@ class FlorisInterface():
     The interface between a FLORIS instance and the wfc tools
     """
 
-    def __init__(self, input_file):
+    def __init__(self, input_file=None, input_dict=None, mode=None):
+        if input_file is None and input_dict is None:
+            raise ValueError('Input file or dictionary must be supplied')
+        if input_file is not None and input_dict is not None:
+            print('Caution: both an input file and an input dictionary are \
+                specified. The input file will be used.')
         self.input_file = input_file
-        self.floris = Floris(input_file=input_file)
+        self.floris = Floris(input_file=input_file, input_dict=input_dict, 
+                                                    mode=mode)
 
     def calculate_wake(self, yaw_angles=None, no_wake=False):
         """

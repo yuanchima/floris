@@ -30,14 +30,16 @@ class Floris():
         Floris: An instantiated Floris object.
     """
 
-    def __init__(self, input_file=None, input_dict=None):
+    def __init__(self, input_file=None, input_dict=None, mode=None):
         self.input_reader = InputReader()
         self.input_file = input_file
         self.input_dict = input_dict
+        self.mode = mode
         self._farm = []
         self.add_farm(
             input_file=self.input_file,
-            input_dict=self.input_dict
+            input_dict=self.input_dict,
+            mode=self.mode
         )
 
     @property
@@ -65,7 +67,7 @@ class Floris():
         if not hasattr(self._farm):
             self._farm = value
 
-    def add_farm(self, input_file=None, input_dict=None):
+    def add_farm(self, input_file=None, input_dict=None, mode=None):
         """
         A method that adds a farm with user-defined input file to the 
         Floris object.
@@ -86,7 +88,8 @@ class Floris():
             >>> floris.add_farm()
         """
         self._farm.append(self.input_reader.read(input_file=input_file,
-                                                 input_dict=input_dict))
+                                                 input_dict=input_dict,
+                                                 mode=mode))
 
     def list_farms(self):
         """

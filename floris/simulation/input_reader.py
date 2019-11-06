@@ -202,7 +202,7 @@ class InputReader():
         propertyDict = self._validateJSON(json_dict, self._farm_properties)
         return Farm(propertyDict, turbine, wake)
 
-    def read(self, input_file=None, input_dict=None):
+    def read(self, input_file=None, input_dict=None, mode=None):
         """
         Parses main input file and instantiates floris objects.
 
@@ -217,9 +217,31 @@ class InputReader():
         elif input_dict is not None:
             json_dict = input_dict.copy()
         else:
-            raise ValueError("Input file or dictionary must be provided")
-
-        turbine = self._build_turbine(json_dict["turbine"])
-        wake = self._build_wake(json_dict["wake"])
-        farm = self._build_farm(json_dict["farm"], turbine, wake)
+            raise ValueError('Input file or dictionary must be provided.')
+        
+        if mode is None or mode is 'python':
+            farm = self._floris_python(json_dict)
+        elif mode is 'julia':
+            farm = self._floris_julia(json_dict)
+        elif mode is 'openMDAO':
+            farm = self._floris_openMDAO(json_dict)
+        else:
+            raise ValueError('Selected mode: ' + str(mode), \
+                             ' is not a valid option.')
+        
         return farm
+
+        def _floris_python(self, json_dict):
+            turbine = self._build_turbine(json_dict["turbine"])
+            wake = self._build_wake(json_dict["wake"])
+            farm = self._build_farm(json_dict["farm"], turbine, wake)
+
+            return farm
+
+        def _floris_julia(self, json_dict):
+            # Develop methods for julia code
+            pass
+
+        def _floris_openMDAO(self, json_dict):
+            # Emulate openMDAO wrappers from plant_energy
+            pass
