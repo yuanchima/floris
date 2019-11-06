@@ -241,7 +241,3 @@ class InputReader():
     def _floris_julia(self, json_dict):
         # Develop methods for julia code
         pass
-
-    def _floris_openMDAO(self, json_dict):
-        # Emulate openMDAO wrappers from plant_energy
-        pass
