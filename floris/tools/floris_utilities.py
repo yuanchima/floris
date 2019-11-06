@@ -646,12 +646,17 @@ class FlorisInterface():
     def get_farm_AEP(self, wd, ws, freq):
         AEP_sum = 0
 
-        for i in range(len(wd)):
-            self.reinitialize_flow_field(
-                wind_direction=wd[i], wind_speed=ws[i])
-            self.calculate_wake()
-            
-            AEP_sum = AEP_sum + self.get_farm_power()*freq[i]*8760
+        if self.mode is 'python':
+            for i in range(len(wd)):
+                self.reinitialize_flow_field(
+                    wind_direction=wd[i], wind_speed=ws[i])
+                self.calculate_wake()
+                
+                AEP_sum = AEP_sum + self.get_farm_power()*freq[i]*8760
+
+        if self.mode is 'julia':
+            print('This will return AEP from julia model.')
+            AEP_sum = 0
         return AEP_sum
 
     @property
