@@ -58,18 +58,47 @@ class FlorisInterface():
 
                 # TODO: Build out with correct inputs and outputs
                 # flow property variables
-                self.add_input('wind_direction', val=self.fi.floris.farm.flow_field, units='deg',
-                            desc='wind direction using direction from, in deg. cw from north as in meteorological data')
-                self.add_input('wind_speed', val=270.0, units='deg',
-                            desc='wind direction using direction from, in deg. cw from north as in meteorological data')
-
-                # Explicitly size input arrays
-                self.add_input('turbineX', val=np.zeros(nTurbines), units='m', desc='x positions of turbines in original ref. frame')
-                self.add_input('turbineY', val=np.zeros(nTurbines), units='m', desc='y positions of turbines in original ref. frame')
+                self.add_input('wind_direction', 
+                            val=self.fi.floris.farm.flow_field.wind_direction, 
+                            units='deg',
+                            desc='wind direction using direction from, in deg. \
+                                cw from north as in meteorological data')
+                self.add_input('wind_speed', 
+                            val=self.fi.floris.farm.flow_field.wind_speed, 
+                            units='m/s', 
+                            desc='wind speed in m/s')
+                self.add_input('wind_frequency',
+                            val=None,
+                            units=None,
+                            desc='wind frequency values from the wind rose')
+                self.add_input('air_density',
+                            val=self.fi.floris.farm.flow_field.air_density,
+                            units='kg/m**3',
+                            desc='density of the air')
+                self.add_input('turbulence_intensity',
+                            val=self.fi.floris.farm.flow_field.turbulence_intensity,
+                            units=None,
+                            desc='turbulence intensity of the flow field')
+                self.add_input('wind_shear',
+                            val=self.fi.floris.farm.flow_field.wind_shear,
+                            units=None,
+                            desc='wind shear of the flow field')
+                self.add_input('wind_veer',
+                            val=self.fi.floris.farm.flow_field.wind_shear,
+                            units=None,
+                            desc='wind veer of the flow field')
+                self.add_input('turbineX',
+                            val=self.fi.layout_x,
+                            units='m',
+                            desc='x coordinates of the turbines')
+                self.add_input('turbineY',
+                            val=self.fi.layout_y,
+                            units='m',
+                            desc='y coordinates of the turbines')
 
                 # add output
-                self.add_output('turbineXw', val=np.zeros(nTurbines), units='m', desc='downwind coordinates of turbines')
-                self.add_output('turbineYw', val=np.zeros(nTurbines), units='m', desc='crosswind coordinates of turbines')
+                self.add_output('AEP', val=0, units='kW*h', 
+                            desc='annualized energy production')
 
                 # finite difference
                 self.declare_partials(of='*', wrt='*', method='fd', form='forward', step=1.0e-5, step_calc='rel')
@@ -96,7 +125,7 @@ class FlorisInterface():
 
                 outputs['AEP'] = self.fi.get_farm_AEP(wd, ws, freq)
 
-        return FlorisOM
+    return FlorisOM
 
     def calculate_wake(self, yaw_angles=None, no_wake=False):
         """
