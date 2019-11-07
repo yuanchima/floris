@@ -23,7 +23,8 @@ class FlorisInterface():
     The interface between a FLORIS instance and the wfc tools
     """
 
-    def __init__(self, input_file=None, input_dict=None, mode=None):
+    def __init__(self, input_file=None, input_dict=None, 
+                                    mode=None, openmdao=False):
         if input_file is None and input_dict is None:
             raise ValueError('Input file or dictionary must be supplied')
         if input_file is not None and input_dict is not None:
@@ -31,10 +32,11 @@ class FlorisInterface():
                 specified. The input file will be used.')
         self.input_file = input_file
         self.mode = mode
+        self.openmdao = openmdao
         self.floris = Floris(input_file=input_file, input_dict=input_dict, 
                                                     mode=self.mode)
 
-        if self.mode is 'python_openMDAO' or self.mode is 'julia_openMDAO':
+        if self.openmdao is True:
             self._floris_openMDAO()
 
     def _floris_openMDAO(self):
@@ -57,7 +59,7 @@ class FlorisInterface():
 
                 # TODO: Build out with correct inputs and outputs
                 # flow property variables
-                self.add_input('wind_direction', val=270.0, units='deg',
+                self.add_input('wind_direction', val=self.fi.floris.farm.flow_field, units='deg',
                             desc='wind direction using direction from, in deg. cw from north as in meteorological data')
                 self.add_input('wind_speed', val=270.0, units='deg',
                             desc='wind direction using direction from, in deg. cw from north as in meteorological data')
