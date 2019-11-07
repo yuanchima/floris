@@ -17,9 +17,9 @@ class Floris():
     """
     Top-level class that contains a Floris model.
 
-    Floris is the highest level class of the Floris package. Import 
-    this class and instantiate it with a path to an input file to 
-    create a Floris model. Use the ``farm`` attribute to access other 
+    Floris is the highest level class of the Floris package. Import
+    this class and instantiate it with a path to an input file to
+    create a Floris model. Use the ``farm`` attribute to access other
     objects within the model.
 
     Args:
@@ -45,11 +45,11 @@ class Floris():
     @property
     def farm(self):
         """
-        Property of the Floris object that returns the farm(s) 
+        Property of the Floris object that returns the farm(s)
         contained within the object.
 
         Returns:
-            Farm: A Farm object, or if multiple farms, a list of Farm 
+            Farm: A Farm object, or if multiple farms, a list of Farm
             objects.
 
         Examples:
@@ -69,20 +69,20 @@ class Floris():
 
     def add_farm(self, input_file=None, input_dict=None, mode=None):
         """
-        A method that adds a farm with user-defined input file to the 
+        A method that adds a farm with user-defined input file to the
         Floris object.
 
         Returns:
-            *None* -- The :py:class:`floris.simulation.floris` object 
+            *None* -- The :py:class:`floris.simulation.floris` object
             is updated directly.
 
         Examples:
-            To add a farm to a Floris object using a specific input 
+            To add a farm to a Floris object using a specific input
             file:
 
             >>> floris.add_farm(input_file='input.json')
 
-            To add a farm to a Floris object using the stored input 
+            To add a farm to a Floris object using the stored input
             file:
 
             >>> floris.add_farm()
@@ -93,7 +93,7 @@ class Floris():
 
     def list_farms(self):
         """
-        A method that lists the farms and relevant farm details stored 
+        A method that lists the farms and relevant farm details stored
         in Floris object.
 
         Returns:
@@ -127,7 +127,7 @@ class Floris():
         A method that imports a farm from a pickle file.
 
         Returns:
-            *None* - Loads the farm into the 
+            *None* - Loads the farm into the
             :py:class:`floris.simulation.floris.farm` object.
 
         Examples:

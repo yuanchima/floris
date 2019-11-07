@@ -2,8 +2,9 @@ abstract type AbstractTurbine end
 
 struct Turbine <: AbstractTurbine
     coord
-    rotor_radius
+    rotor_diameter
     hub_height
+    aI
 end
 
 struct Coord
