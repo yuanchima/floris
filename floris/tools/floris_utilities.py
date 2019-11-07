@@ -16,6 +16,7 @@ from .flow_data import FlowData
 from ..utilities import Vec3
 import copy
 from scipy.stats import norm
+from types import ClassType
 
 
 class FlorisInterface():
@@ -43,15 +44,14 @@ class FlorisInterface():
         # Emulate openMDAO wrappers from plant_energy
         import openmdao.api as om
 
-        class WindFrame(om.ExplicitComponent):
+        class floris_om(om.ExplicitComponent):
             """ Calculates the locations of each turbine in the wind direction reference frame """
 
             def initialize(self):
                 """
                 Declare options.
                 """
-                self.options.declare('fi', types=class, 
-                                    desc="FlorisInterface class.")
+                self.options.declare('fi', types=ClassType, desc="FlorisInterface class.")
 
             def setup(self):
                 opt = self.options
