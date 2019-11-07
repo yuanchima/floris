@@ -48,7 +48,7 @@ function loss(x_locations, y_locations, z_locations, turbine::Turbine,
     c[z_locations > z_upper] = 0
     c[z_locations < z_lower] = 0
 
-    return 2 * turbine.aI * c * flow_field.u_initial, zeros(np.shape(flow_field.u_initial)), zeros(np.shape(flow_field.u_initial))
+    return 2 * turbine.aI * c * flow_field.u_initial, zeros(size(flow_field.u_initial)), zeros(size(flow_field.u_initial))
 end
 
 
