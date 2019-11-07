@@ -35,7 +35,7 @@ indeps.add_output('turbineY', fi.layout_y, units='m')
 prob.model.add_subsystem('floris', FlorisComponent(fi=fi), promotes=['*'])
 
 # set up objective component
-obj_comp = om.ExecComp('obj = -AEP')
+obj_comp = om.ExecComp('obj = -AEP', AEP={'value': 0.0, 'units': 'kW*h'})
 prob.model.add_subsystem('obj_comp', obj_comp, promotes=['obj', 'AEP'])
 
 # setup the optimizer
