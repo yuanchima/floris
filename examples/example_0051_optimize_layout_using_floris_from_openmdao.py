@@ -31,13 +31,20 @@ prob.model.add_subsystem('floris', FlorisComponent(fi=fi), promotes=['*'])
 
 # setup the optimizer
 prob.driver = om.ScipyOptimizeDriver()
-prob.driver.options['optimizer'] = 'COBYLA'
+prob.driver.options['optimizer'] = 'SLSQP'
+prob.driver.options['tol'] = 1e-6
 
 # set up design variables
+indeps = prob.model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
+indeps.add_output('turbineX', fi.layout_x)
+indeps.add_output('turbineY', fi.layout_y)
 
 prob.model.add_design_var('turbineX', lower=np.min(fi.layout_x), upper=np.max(fi.layout_x))
 prob.model.add_design_var('turbineY', lower=np.min(fi.layout_y), upper=np.max(fi.layout_y))
 prob.model.add_objective('AEP')
+
+# Ask OpenMDAO to finite-difference across the model to compute the gradients for the optimizer
+prob.model.approx_totals()
 
 # setup model
 prob.setup()
