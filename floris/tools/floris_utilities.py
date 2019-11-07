@@ -16,7 +16,7 @@ from .flow_data import FlowData
 from ..utilities import Vec3
 import copy
 from scipy.stats import norm
-from types import ClassType
+from types import ModuleType
 
 
 class FlorisInterface():
@@ -50,7 +50,7 @@ class FlorisInterface():
             def initialize(self):
                 # Declare options
 
-                self.options.declare('fi', types=ClassType, desc="FlorisInterface class.")
+                self.options.declare('fi', types=FlorisInterface, desc="FlorisInterface class.")
 
             def setup(self):
                 opt = self.options
@@ -68,7 +68,7 @@ class FlorisInterface():
                             units='m/s', 
                             desc='wind speed in m/s')
                 self.add_input('wind_frequency',
-                            val=None,
+                            val=1.0,
                             units=None,
                             desc='wind frequency values from the wind rose')
                 self.add_input('air_density',
@@ -125,7 +125,7 @@ class FlorisInterface():
 
                 outputs['AEP'] = self.fi.get_farm_AEP(wd, ws, freq)
 
-    return FlorisOM
+        return FlorisOM
 
     def calculate_wake(self, yaw_angles=None, no_wake=False):
         """

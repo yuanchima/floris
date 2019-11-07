@@ -27,7 +27,10 @@ FlorisComponent = fi._floris_openMDAO()
 prob = om.Problem()
 
 # add floris to the OpenMDAO problem
-prob.model.add_subsystem('floris', FlorisComponent(fi=fi))
+prob.model.add_subsystem('floris', FlorisComponent(fi=fi), promotes=['*'])
+
+# set up OpenMDAO problem
+prob.setup()
 
 # define wind rose information
 prob['wind_direction'] = 270.
