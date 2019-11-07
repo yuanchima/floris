@@ -35,11 +35,10 @@ class FlorisInterface():
                                                     mode=self.mode)
 
         if self.mode is 'python_openMDAO' or self.mode is 'julia_openMDAO':
-            pass
+            self._floris_openMDAO()
 
-    def _floris_openMDAO(self, json_dict):
+    def _floris_openMDAO(self):
         # Emulate openMDAO wrappers from plant_energy
-        pass
         import openmdao.api as om
 
         class WindFrame(om.ExplicitComponent):
@@ -54,10 +53,13 @@ class FlorisInterface():
 
             def setup(self):
                 opt = self.options
-                fi = opt['fi']
+                self.fi = opt['fi']
 
+                # TODO: Build out with correct inputs and outputs
                 # flow property variables
                 self.add_input('wind_direction', val=270.0, units='deg',
+                            desc='wind direction using direction from, in deg. cw from north as in meteorological data')
+                self.add_input('wind_speed', val=270.0, units='deg',
                             desc='wind direction using direction from, in deg. cw from north as in meteorological data')
 
                 # Explicitly size input arrays
@@ -68,90 +70,30 @@ class FlorisInterface():
                 self.add_output('turbineXw', val=np.zeros(nTurbines), units='m', desc='downwind coordinates of turbines')
                 self.add_output('turbineYw', val=np.zeros(nTurbines), units='m', desc='crosswind coordinates of turbines')
 
-                # ############################ visualization arrays ##################################
+                # finite difference
+                self.declare_partials(of='*', wrt='*', method='fd', form='forward', step=1.0e-5, step_calc='rel')
 
-                if nSamples > 0:
-
-                    # visualization input Note: always adding the inputs so that we
-                    # don't have to chnage the signature on compute.
-                    self.add_discrete_input('wsPositionX', np.zeros(nSamples),
-                                            desc='X position of desired measurements in original ref. frame')
-                    self.add_discrete_input('wsPositionY', np.zeros(nSamples),
-                                            desc='Y position of desired measurements in original ref. frame')
-                    self.add_discrete_input('wPositionZ', np.zeros(nSamples),
-                                        desc='Z position of desired measurements in original ref. frame')
-
-                    # visualization output
-                    self.add_discrete_output('wsPositionXw', np.zeros(nSamples),
-                                            desc='position of desired measurements in wind ref. frame')
-                    self.add_discrete_output('wsPositionYw', np.zeros(nSamples),
-                                            desc='position of desired measurements in wind ref. frame')
-
-                # Derivatives
-                if differentiable:
-                    self.declare_partials(of='*', wrt='wind_direction')
-
-                    row_col = np.arange(nTurbines)
-                    self.declare_partials(of='*', wrt=['turbineX', 'turbineY'], rows=row_col, cols=row_col)
-
-                else:
-                    # finite difference used for testing only
-                    self.declare_partials(of='*', wrt='*', method='fd', form='forward', step=1.0e-5,
-                                        step_calc='rel')
-
-            def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
-                nSamples = self.options['nSamples']
-
-                windDirectionDeg = inputs['wind_direction']
-
-                # get turbine positions and velocity sampling positions
+            def compute(self, inputs, outputs, 
+                        discrete_inputs=None, discrete_outputs=None):
+                # Parse inputs for openMDAO
                 turbineX = inputs['turbineX']
                 turbineY = inputs['turbineY']
+                wd = inputs['wind_direction']
+                ws = inputs['wind_speed']
+                freq = inputs['wind_frequency']
+                air_density = inputs['air_density']
+                TI = inputs['turbulence_intensity']
+                wind_shear = inputs['wind_shear']
+                wind_veer = inputs['wind_veer']
 
-                # convert to downwind(x)-crosswind(y) coordinates
-                outputs['turbineXw'] = turbineX*cos_wdr - turbineY*sin_wdr
-                outputs['turbineYw'] = turbineX*sin_wdr + turbineY*cos_wdr
+                self.fi.reinitialize_flow_field(
+                                    layout_array=(turbineX, turbineY),
+                                    wind_shear=wind_shear,
+                                    wind_veer=wind_veer,
+                                    turbulence_intensity=TI,
+                                    air_density=air_density)
 
-                if nSamples > 0:
-                    velX = discrete_inputs['wsPositionX']
-                    velY = discrete_inputs['wsPositionY']
-
-                    discrete_outputs['wsPositionXw'] = velX*cos_wdr - velY*sin_wdr
-                    discrete_outputs['wsPositionYw'] = velX*sin_wdr + velY*cos_wdr
-
-            def compute_partials(self, inputs, partials, discrete_inputs=None):
-
-                # obtain necessary inputs
-                windDirectionDeg = inputs['wind_direction']
-                turbineX = inputs['turbineX']
-                turbineY = inputs['turbineY']
-
-                # convert from meteorological polar system (CW, 0 deg.=N) to standard polar system (CCW, 0 deg.=E)
-                windDirectionDeg = 270. - windDirectionDeg
-                if windDirectionDeg < 0.:
-                    windDirectionDeg += 360.
-
-                # convert inflow wind direction to radians
-                windDirectionRad = np.pi*windDirectionDeg/180.0
-
-                cos_wdr = np.cos(-windDirectionRad)
-                sin_wdr = np.sin(-windDirectionRad)
-
-                # calculate gradients of conversion to wind direction reference frame
-                dturbineXw_dturbineX = cos_wdr
-                dturbineXw_dturbineY = -sin_wdr
-                dturbineYw_dturbineX = sin_wdr
-                dturbineYw_dturbineY = cos_wdr
-
-                # populate Jacobian dict
-                partials['turbineXw', 'turbineX'] = dturbineXw_dturbineX
-                partials['turbineXw', 'turbineY'] = dturbineXw_dturbineY
-                partials['turbineYw', 'turbineX'] = dturbineYw_dturbineX
-                partials['turbineYw', 'turbineY'] = dturbineYw_dturbineY
-
-                deg2rad = np.pi / 180.0
-                partials['turbineXw', 'wind_direction'] = -deg2rad * (turbineX * sin_wdr + turbineY * cos_wdr)
-                partials['turbineYw', 'wind_direction'] = deg2rad * (turbineX * cos_wdr - turbineY * sin_wdr)
+                outputs['AEP'] = self.fi.get_farm_AEP(wd, ws, freq)
 
     def calculate_wake(self, yaw_angles=None, no_wake=False):
         """
