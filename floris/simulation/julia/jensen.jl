@@ -6,6 +6,23 @@ struct Jensen <: AbstractWakeModel
     we
 end
 
+struct Multizone <: AbstractWakeModel
+    me
+    we
+    aU
+    bU
+    mU
+end
+
+struct Gauss <: AbstractWakeModel
+    ka
+    kb
+    alpha
+    beta
+    ad
+    bd
+end
+
 struct Turbine <: AbstractTurbine
     coord
     rotor_radius
@@ -17,7 +34,7 @@ struct Coord
     x3
 end
 
-function loss(x_locations, y_locations, z_locations, turbine::Turbine, 
+function loss(x_locations, y_locations, z_locations, turbine::Turbine,
               deflection_field, flow_field, model::Jensen)
     m = model.we
     x = x_locations - turbine.coord.x1
@@ -26,6 +43,17 @@ function loss(x_locations, y_locations, z_locations, turbine::Turbine,
     boundary_line = m * x + b
 
     y_upper = boundary_line + turbine.coord.x1
+end
+
+
+function loss(x_locations, y_locations, z_locations, turbine::Turbine,
+              deflection_field, flow_field, model::Multizone)
+    #return the losses from the multizone FLORIS wake model
+end
+
+function loss(x_locations, y_locations, z_locations, turbine::Turbine,
+              deflection_field, flow_field, model::Gauss)
+    #return the losses using the Bastankhah Gaussian wake model
 end
 
 function mult(x, y, z)
