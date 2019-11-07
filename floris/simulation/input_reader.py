@@ -223,8 +223,6 @@ class InputReader():
             farm = self._floris_python(json_dict)
         elif mode is 'julia':
             farm = self._floris_julia(json_dict)
-        elif mode is 'openMDAO':
-            farm = self._floris_openMDAO(json_dict)
         else:
             raise ValueError('Selected mode: ' + str(mode), \
                              ' is not a valid option.')
