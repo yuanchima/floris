@@ -23,7 +23,6 @@ struct Gauss <: AbstractWakeModel
     bd
 end
 
-
 function loss(x_locations, y_locations, z_locations, turbine::Turbine,
               deflection_field, flow_field, model::Jensen)
     m = model.we
@@ -32,7 +31,24 @@ function loss(x_locations, y_locations, z_locations, turbine::Turbine,
 
     boundary_line = m * x + b
 
-    y_upper = boundary_line + turbine.coord.x1
+    y_upper = boundary_line + turbine.coord.x1 + deflection_field
+    y_lower = -1 * boundary_line + turbine.coord.x2 + deflection_field
+
+    z_upper = boundary_line + turbine.hub_height
+    z_lower = -1 * boundary_line + turbine.hub_height
+
+    # calculate the wake velocity
+    c = (turbine.rotor_diameter /
+        (2 * model.we * (x_locations - turbine.coord.x1) + turbine.rotor_diameter))^2
+
+    # filter points upstream and beyond the upper and lower bounds of the wake
+    c[x_locations - turbine.coord.x1 < 0] = 0
+    c[y_locations > y_upper] = 0
+    c[y_locations < y_lower] = 0
+    c[z_locations > z_upper] = 0
+    c[z_locations < z_lower] = 0
+
+    return 2 * turbine.aI * c * flow_field.u_initial, zeros(np.shape(flow_field.u_initial)), zeros(np.shape(flow_field.u_initial))
 end
 
 
