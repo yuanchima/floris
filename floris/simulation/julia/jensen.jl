@@ -1,6 +1,6 @@
-abstract type AbstractWakeModel end
+include("turbines.jl")
 
-abstract type AbstractTurbine end
+abstract type AbstractWakeModel end
 
 struct Jensen <: AbstractWakeModel
     we
@@ -23,16 +23,6 @@ struct Gauss <: AbstractWakeModel
     bd
 end
 
-struct Turbine <: AbstractTurbine
-    coord
-    rotor_radius
-end
-
-struct Coord
-    x1
-    x2
-    x3
-end
 
 function loss(x_locations, y_locations, z_locations, turbine::Turbine,
               deflection_field, flow_field, model::Jensen)
