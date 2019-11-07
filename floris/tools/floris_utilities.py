@@ -44,13 +44,12 @@ class FlorisInterface():
         # Emulate openMDAO wrappers from plant_energy
         import openmdao.api as om
 
-        class floris_om(om.ExplicitComponent):
-            """ Calculates the locations of each turbine in the wind direction reference frame """
+        class FlorisOM(om.ExplicitComponent):
+            # OpenMDAO wrapper for floris
 
             def initialize(self):
-                """
-                Declare options.
-                """
+                # Declare options
+
                 self.options.declare('fi', types=ClassType, desc="FlorisInterface class.")
 
             def setup(self):
@@ -96,6 +95,8 @@ class FlorisInterface():
                                     air_density=air_density)
 
                 outputs['AEP'] = self.fi.get_farm_AEP(wd, ws, freq)
+
+        return FlorisOM
 
     def calculate_wake(self, yaw_angles=None, no_wake=False):
         """
