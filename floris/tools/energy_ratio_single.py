@@ -15,6 +15,7 @@
 
 import numpy as np
 import pandas as pd
+
 import matplotlib.pyplot as plt
 
 
@@ -265,11 +266,15 @@ def calculate_balanced_energy_ratio(
         wind_dir_array_baseline_wd = wind_direction_array_baseline[
             wind_dir_mask_baseline
         ]
-        baseline_weight = gaussian(
-            wind_dir_array_baseline_wd,
-            wind_direction_bin,
-            wind_direction_bin_radius / 2.0,
-        )
+
+        if wind_direction_bin_p_overlap > 5.0:
+            baseline_weight = gaussian(
+                wind_dir_array_baseline_wd,
+                wind_direction_bin,
+                wind_direction_bin_radius / 2.0,
+            )
+        else:
+            baseline_weight = np.ones_like(wind_dir_array_baseline_wd)
         baseline_weight = baseline_weight / np.sum(baseline_weight)
 
         if len(reference_power_baseline_wd) == 0:
