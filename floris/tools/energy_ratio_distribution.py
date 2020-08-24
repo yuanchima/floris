@@ -117,7 +117,7 @@ def _get_confidence_bounds(confidence):
     return [50 + 0.5 * confidence, 50 - 0.5 * confidence]
 
 
-def energy_ratio(ref_pow_base, test_pow_base):
+def energy_ratio(ref_power, test_power):
     """
     Compute the balanced energy ratio for a single binned wind direction
 
@@ -137,9 +137,9 @@ def energy_ratio(ref_pow_base, test_pow_base):
             :keyprefix: ers-
 
     Args:
-        ref_pow_base (np.array): Array of baseline reference turbine
+        ref_power (np.array): Array of baseline reference turbine
             power.
-        test_pow_base (np.array): Array of baseline test turbine power.
+        test_power (np.array): Array of baseline test turbine power.
 
 
     Returns:
@@ -149,22 +149,22 @@ def energy_ratio(ref_pow_base, test_pow_base):
             -   **counts_base** (*float*): Number of points in baseline.
     """
 
-    if len(ref_pow_base) == 0:
+    if len(ref_power) == 0:
         return np.nan, np.nan
 
-    # Weighted sums
-    weight_sum_ref_base = np.sum(ref_pow_base)
-    weight_sum_test_base = np.sum(test_pow_base)
+    # Sums
+    ref_sum = np.sum(ref_power)
+    test_sum = np.sum(test_power)
 
-    if (weight_sum_ref_base == 0) or (weight_sum_test_base == 0):
+    if (ref_sum == 0) or (test_sum == 0):
         return np.nan, np.nan
 
-    ratio_base = weight_sum_test_base / weight_sum_ref_base
+    ratio = test_sum / ref_sum
 
     # Get the counts
-    counts_base = len(ref_pow_base)
+    counts = len(ref_power)
 
-    return ratio_base, counts_base
+    return ratio, counts
 
 
 def calculate_balanced_energy_ratio(
@@ -175,7 +175,7 @@ def calculate_balanced_energy_ratio(
     confidence=95,
     n_boostrap=None,
     wind_direction_bin_p_overlap=None,
-    wind_speed_array_baseline=None,
+    wind_speed_array=None,
     wind_speed_bins=None,
     wind_speed_distribution=None
 ):
@@ -245,10 +245,13 @@ def calculate_balanced_energy_ratio(
     wind_direction_array_baseline = _convert_to_numpy_array(
         wind_direction_array_baseline
     )
+    wind_speed_array = _convert_to_numpy_array(wind_speed_array) 
+    # ^^ should preserve None value
 
     # Handle no overlap specificed (assume non-overlap)
+    # MS: What is the point of this? Why not just have default 0?
     if wind_direction_bin_p_overlap is None:
-        wind_direction_bin_p_overlap = 0
+        wind_direction_bin_p_overlap = 0 
 
     # Compute binning radius (is this right?)
     wind_direction_bin_radius = (
@@ -277,22 +280,22 @@ def calculate_balanced_energy_ratio(
         wind_dir_array_baseline_wd = wind_direction_array_baseline[
             wind_dir_mask_baseline
         ]
+        wind_speed_array_wd = wind_direction_array[wind_dir_mask_baseline]
 
-        if wind_direction_bin_p_overlap > 5.0:
-            baseline_weight = gaussian(
+        if wind_direction_bin_p_overlap > 5.0: # Gaussian weights (?) CHECK
+            binning_weight = gaussian(
                 wind_dir_array_baseline_wd,
                 wind_direction_bin,
                 wind_direction_bin_radius / 2.0,
             )
-        else:
-            baseline_weight = np.ones_like(wind_dir_array_baseline_wd)
-        baseline_weight = baseline_weight / np.sum(baseline_weight)
+        else: # Uniform distribution over bin
+            binning_weight = np.ones_like(wind_dir_array_baseline_wd)
+        binning_weight = binning_weight / np.sum(binning_weight)
 
         if len(reference_power_baseline_wd) == 0:
             continue
-
-        # compute the energy ratio
-        # ratio_array_base[i], counts_ratio_array_base[i] = energy_ratio(reference_power_baseline_wd, test_power_baseline_wd)
+            # MS: may need some handling here. Well, this is if there is a 
+            # wind direction bin without a single wind speed...
 
         # Get the bounds through boot strapping
         # determine the number of bootstrap iterations if not given
@@ -310,7 +313,7 @@ def calculate_balanced_energy_ratio(
             ind_bs = np.random.choice(
                 len(reference_power_baseline_wd),
                 size=len(reference_power_baseline_wd),
-                p=baseline_weight,
+                p=binning_weight,
             )
             reference_power_binned_baseline = reference_power_baseline_wd[ind_bs]
             test_power_binned_baseline = test_power_baseline_wd[ind_bs]
@@ -425,7 +428,7 @@ def plot_energy_ratio(
         test_power_baseline,
         wind_direction_array_baseline,
         wind_direction_bins,
-        confidence=95,
+        confidence=confidence,
         n_boostrap=None,
         wind_direction_bin_p_overlap=wind_direction_bin_p_overlap,
     )
