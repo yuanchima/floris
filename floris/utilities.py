@@ -13,6 +13,7 @@
 # See https://floris.readthedocs.io for documentation
 
 import numpy as np
+from numba import jit
 
 
 class Vec3:
@@ -47,9 +48,8 @@ class Vec3:
 
         # If they arent, cast all components to the same type
         if not (
-            type(self.x1) == type(self.x2)
-            and type(self.x1) == type(self.x3)
-            and type(self.x2) == type(self.x3)
+            isinstance(self.x1, (type(self.x2), type(self.x3)))
+            and isinstance(self.x2, type(self.x3))
         ):
             target_type = type(self.x1)
             self.x2 = target_type(self.x2)
@@ -58,9 +58,9 @@ class Vec3:
         if string_format is not None:
             self.string_format = string_format
         else:
-            if type(self.x1) in [int]:
+            if isinstance(self.x1, (int)):
                 self.string_format = "{:8d}"
-            elif type(self.x1) in [float, np.float64]:
+            elif isinstance(self.x1, (float, np.float64)):
                 self.string_format = "{:8.3f}"
 
     def rotate_on_x3(self, theta, center_of_rotation=None):
@@ -89,6 +89,10 @@ class Vec3:
             x2offset * cosd(theta) + x1offset * sind(theta) + center_of_rotation.x2
         )
         self.x3prime = self.x3
+
+    @property
+    def coords(self):
+        return self.x1, self.x2, self.x3
 
     def __str__(self):
         template_string = "{} {} {}".format(
@@ -129,6 +133,7 @@ class Vec3:
         return hash((self.x1, self.x2, self.x3))
 
 
+@jit(nopython=True)
 def cosd(angle):
     """
     Cosine of an angle with the angle given in degrees.
@@ -142,6 +147,7 @@ def cosd(angle):
     return np.cos(np.radians(angle))
 
 
+@jit(nopython=True)
 def sind(angle):
     """
     Sine of an angle with the angle given in degrees.
@@ -155,6 +161,7 @@ def sind(angle):
     return np.sin(np.radians(angle))
 
 
+@jit(nopython=True)
 def tand(angle):
     """
     Tangent of an angle with the angle given in degrees.
@@ -166,6 +173,41 @@ def tand(angle):
         float
     """
     return np.tan(np.radians(angle))
+
+
+@jit(nopython=True)
+def wrap_180_fast(x):
+    """
+    Shift the given values to within the range (-180, 180].
+
+    Args:
+        x (numeric or np.array): Scalar value or np.array of values to shift.
+
+    Returns:
+        np.array: Shifted values.
+    """
+    x = np.where(x <= -180.0, x + 360.0, x)
+    x = np.where(x > 180.0, x - 360.0, x)
+    return x
+
+
+@jit(nopython=True)
+def wrap_360_fast(x):
+    """
+    Shift the given values to within the range (0, 360].
+
+    Args:
+        x (numeric or np.array): Scalar value or np.array of values to shift.
+
+    Returns:
+        np.array: Shifted values.
+    """
+    x = np.where(x < 0.0, x + 360.0, x)
+    x = np.where(x >= 360.0, x - 360.0, x)
+    return x
+
+
+# NEED TO LEAVE UNCOMPILED FOR EXTERNAL DEPENDENTS USING PANDAS-->
 
 
 def wrap_180(x):
