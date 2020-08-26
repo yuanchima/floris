@@ -15,9 +15,107 @@
 
 import numpy as np
 import scipy as sp
+from numba import jit, njit
 from scipy.interpolate import griddata
 
 from ..utilities import Vec3, cosd, sind, tand
+
+
+@njit
+def rotate_grid(
+    initial_rotated_x,
+    initial_rotated_y,
+    rx,
+    ry,
+    coord_x1,
+    coord_x2,
+    rotation_x1,
+    rotation_x2,
+    grid_wind_direction,
+    turbine_wind_direction,
+):
+    """Computes the rotated grid for heterogenous wind directions, otherwise returns
+    the original grid
+
+    Args:
+        initial_rotated_x
+        initial_rotated_y
+        rx
+        ry
+        coord_x1 : coord.x1
+        coord_x2 : coord.x2
+        rotation_x1 : center_of_rotation.x1
+        rotation_x2 : center_of_rotation.x1
+        grid_wind_direction : FlowField.wind_map.grid_wind_direction
+        turbine_wind_direction : FlowField.self.wind_map.turbine_wind_direction
+
+    Returns:
+        x (np.ndarray): x-coordinates?
+        y (np.ndarray): y-coordinates?
+    """
+    if np.unique(grid_wind_direction).size == 1:
+        # only rotate grid once for homogeneous wind direction
+        return initial_rotated_x, initial_rotated_y
+
+    idx = np.where(np.logical_and((rx == coord_x1), (ry == coord_x2)))[0]
+    # adjust grid rotation with respect to current turbine for
+    # heterogeneous wind direction
+    wd = turbine_wind_direction[idx] - grid_wind_direction
+
+    # for straight wakes, change rx[idx] to initial_rotated_x
+    xoffset = rotation_x1 - rx[idx]
+    # for straight wakes, change ry[idx] to initial_rotated_y
+    yoffset = rotation_x2 - ry[idx]
+    yoffset = xoffset * sind(wd) + yoffset * cosd(wd) - yoffset
+    rotated_y = initial_rotated_y - yoffset
+
+    xoffset = rotation_x1 - initial_rotated_x
+    yoffset = rotation_x2 - initial_rotated_y
+    xoffset = xoffset * cosd(wd) - yoffset * sind(wd) - xoffset
+    rotated_x = initial_rotated_x - xoffset
+    return rotated_x, rotated_y
+
+
+@njit
+def _find_overlap(rx, ry, x1, x2):
+    """Finds overlapping points in the wake field?
+
+    Args :
+        rx (np.ndarray):
+        ry (np.ndarray):
+        x1 (float): `coord_ti.x1`
+        x2 (float): `coord_ti.x2`
+
+    Returns :
+        (np.ndarray): Array of overlapping points?
+    """
+    return np.where(np.logical_and((rx == x1), (ry == x2)))[0][0]
+
+
+@njit
+def _calculate_intensity(ti_calculation, intensity, current_intensity):
+    """Computes the intermediate intensity value?
+
+    Args:
+        ti_calculation (type):
+        intensity (type): `wind_map.turbine_turbulence_intensity[idx]`
+
+    Returns:
+        (type):
+    """
+    return max(current_intensity, np.sqrt(ti_calculation ** 2 + intensity ** 2))
+
+
+@njit
+def _update_grid(x_grid_i, y_grid_i, wind_direction_i, x1, x2):
+    xoffset = x_grid_i - x1
+    yoffset = y_grid_i.T - x2
+    wind_cos = cosd(-wind_direction_i)
+    wind_sin = sind(-wind_direction_i)
+
+    x_grid_i = xoffset * wind_cos - yoffset * wind_sin + x1
+    y_grid_i = yoffset * wind_cos + xoffset * wind_sin + x2
+    return x_grid_i, y_grid_i
 
 
 class FlowField:
@@ -73,44 +171,39 @@ class FlowField:
         Create grid points at each turbine
         """
         xt = [coord.x1 for coord in self.turbine_map.coords]
-        rotor_points = int(np.sqrt(self.turbine_map.turbines[0].grid_point_count))
-        x_grid = np.zeros((len(xt), rotor_points, rotor_points))
-        y_grid = np.zeros((len(xt), rotor_points, rotor_points))
-        z_grid = np.zeros((len(xt), rotor_points, rotor_points))
+        ngrid = self.turbine_map.turbines[0].ngrid
+        x_grid = np.zeros((len(xt), ngrid, ngrid))
+        y_grid = np.zeros((len(xt), ngrid, ngrid))
+        z_grid = np.zeros((len(xt), ngrid, ngrid))
 
         for i, (coord, turbine) in enumerate(self.turbine_map.items):
-            xt = [coord.x1 for coord in self.turbine_map.coords]
+
+            x1, x2, x3 = coord.coords
+            # Save to the turbine its points
+            turbine.saved_points = i * ngrid * ngrid + np.arange(ngrid*ngrid)
+
+            pt = turbine.rloc*turbine.rotor_radius
             yt = np.linspace(
-                coord.x2 - turbine.rotor_radius,
-                coord.x2 + turbine.rotor_radius,
-                rotor_points,
+                x2 - pt,
+                x2 + pt,
+                ngrid,
             )
             zt = np.linspace(
-                coord.x3 - turbine.rotor_radius,
-                coord.x3 + turbine.rotor_radius,
-                rotor_points,
+                x3 - pt,
+                x3 + pt,
+                ngrid,
+            )
+            x_grid[i] = xt[i]
+            y_grid[i] = yt
+            z_grid[i] = zt
+
+            x_grid[i], y_grid[i] = _update_grid(
+                x_grid[i], y_grid[i], self.wind_map.turbine_wind_direction[i], x1, x2
             )
 
-            for j in range(len(yt)):
-                for k in range(len(zt)):
-                    x_grid[i, j, k] = xt[i]
-                    y_grid[i, j, k] = yt[j]
-                    z_grid[i, j, k] = zt[k]
-
-                    xoffset = x_grid[i, j, k] - coord.x1
-                    yoffset = y_grid[i, j, k] - coord.x2
-                    x_grid[i, j, k] = (
-                        xoffset * cosd(-1 * self.wind_map.turbine_wind_direction[i])
-                        - yoffset * sind(-1 * self.wind_map.turbine_wind_direction[i])
-                        + coord.x1
-                    )
-
-                    y_grid[i, j, k] = (
-                        yoffset * cosd(-1 * self.wind_map.turbine_wind_direction[i])
-                        + xoffset * sind(-1 * self.wind_map.turbine_wind_direction[i])
-                        + coord.x2
-                    )
-
+        # print("x_grid: ", x_grid)
+        # print("y_grid: ", y_grid)
+        # print("z_grid: ", z_grid)
         return x_grid, y_grid, z_grid
 
     def _discretize_gridded_domain(
@@ -330,13 +423,16 @@ class FlowField:
         Rotate the discrete flow field grid and turbine map.
         """
         # get new boundaries for the wind farm once rotated
-        x_coord = []
-        y_coord = []
-        for coord in rotated_map.coords:
-            x_coord.append(coord.x1)
-            y_coord.append(coord.x2)
+
+        # x_coord = []
+        # y_coord = []
+        # for coord in rotated_map.coords:
+        #     x_coord.append(coord.x1)
+        #     y_coord.append(coord.x2)
 
         if self.wake.velocity_model.model_string == "curl":
+            x_coord = [coord.x1 for coord in rotated_map.coords]
+            y_coord = [coord.x2 for coord in rotated_map.coords]
             # re-setup the grid for the curl model
             xmin = np.min(x_coord) - 2 * self.max_diameter
             xmax = np.max(x_coord) + 10 * self.max_diameter
@@ -372,6 +468,7 @@ class FlowField:
         compute wake overlap based on the number of points that are not freestream velocity, i.e. affected by the wake
         """
         count = np.sum(freestream_velocities - wake_velocities <= 0.05)
+
         return (turbine.grid_point_count - count) / turbine.grid_point_count
 
     # Public methods
@@ -545,6 +642,43 @@ class FlowField:
             ]
             turbine.reset_velocities()
 
+    def _calculate_overlap(
+        self,
+        turbine,
+        turbine_ti,
+        coord_ti,
+        rotated_x,
+        rotated_y,
+        rotated_z,
+        turb_u_wake,
+    ):
+        """Calculates the area of the overlap in wakes and turbines?
+
+        Args:
+            turbine
+            turbine_ti
+            coord_ti
+            rotated_x
+            rotated_y
+            rotated_z
+            turb_u_wake
+
+        Returns:
+            area_overlap (float): Area of the overlapping wakes and turbines?
+        """
+        area_overlap = self._calculate_area_overlap(
+            *turbine_ti.calculate_swept_area_velocities(
+                self.u_initial,
+                coord_ti,
+                rotated_x,
+                rotated_y,
+                rotated_z,
+                additional_wind_speed=self.u_initial - turb_u_wake,
+            )[::-1],
+            turbine,
+        )
+        return area_overlap
+
     def calculate_wake(self, no_wake=False, points=None, track_n_upstream_wakes=False):
         """
         Updates the flow field based on turbine activity.
@@ -610,38 +744,27 @@ class FlowField:
         self.v = np.zeros(np.shape(self.u))
         self.w = np.zeros(np.shape(self.u))
 
-        rx = np.zeros(len(self.turbine_map.coords))
-        ry = np.zeros(len(self.turbine_map.coords))
-        for i, cord in enumerate(self.turbine_map.coords):
-            rx[i], ry[i] = cord.x1prime, cord.x2prime
+        rx = np.array([coord.x1prime for coord in self.turbine_map.coords])
+        ry = np.array([coord.x2prime for coord in self.turbine_map.coords])
+        # rx = np.zeros(len(self.turbine_map.coords))
+        # ry = np.zeros(len(self.turbine_map.coords))
+        # for i, cord in enumerate(self.turbine_map.coords):
+        #     rx[i], ry[i] = cord.x1prime, cord.x2prime
 
         for coord, turbine in sorted_map:
-            xloc, yloc = np.array(rx == coord.x1), np.array(ry == coord.x2)
-            idx = int(np.where(np.logical_and(yloc, xloc))[0])
-
-            if np.unique(self.wind_map.grid_wind_direction).size == 1:
-                # only rotate grid once for homogeneous wind direction
-                rotated_x, rotated_y = initial_rotated_x, initial_rotated_y
-
-            else:
-                # adjust grid rotation with respect to current turbine for
-                # heterogeneous wind direction
-                wd = (
-                    self.wind_map.turbine_wind_direction[idx]
-                    - self.wind_map.grid_wind_direction
-                )
-
-                # for straight wakes, change rx[idx] to initial_rotated_x
-                xoffset = center_of_rotation.x1 - rx[idx]
-                # for straight wakes, change ry[idx] to initial_rotated_y
-                yoffset = center_of_rotation.x2 - ry[idx]
-                y_grid_offset = xoffset * sind(wd) + yoffset * cosd(wd) - yoffset
-                rotated_y = initial_rotated_y - y_grid_offset
-
-                xoffset = center_of_rotation.x1 - initial_rotated_x
-                yoffset = center_of_rotation.x2 - initial_rotated_y
-                x_grid_offset = xoffset * cosd(wd) - yoffset * sind(wd) - xoffset
-                rotated_x = initial_rotated_x - x_grid_offset
+            # rotate the grid based on wind direction
+            rotated_x, rotated_y = rotate_grid(
+                initial_rotated_x,
+                initial_rotated_y,
+                rx,
+                ry,
+                coord.x1,
+                coord.x2,
+                center_of_rotation.x1,
+                center_of_rotation.x2,
+                self.wind_map.grid_wind_direction,
+                np.array(self.wind_map.turbine_wind_direction),
+            )
 
             # update the turbine based on the velocity at its hub
             turbine.update_velocities(
@@ -665,49 +788,50 @@ class FlowField:
             ###########
             # include turbulence model for the gaussian wake model from
             # Porte-Agel
-            if (
-                "crespo_hernandez" == self.wake.turbulence_model.model_string
-                or self.wake.turbulence_model.model_string == "ishihara_qian"
-            ):
+            _turb_models = ("crespo_hernandez", "ishihara_qian")
+            if self.wake.turbulence_model.model_string in _turb_models:
                 # compute area overlap of wake on other turbines and update
                 # downstream turbine turbulence intensities
                 for coord_ti, turbine_ti in sorted_map:
-                    xloc, yloc = (
-                        np.array(rx == coord_ti.x1),
-                        np.array(ry == coord_ti.x2),
-                    )
-                    idx = int(np.where(np.logical_and(yloc, xloc))[0])
+                    # xloc = np.array(rx == coord_ti.x1)
+                    # yloc = np.array(ry == coord_ti.x2)
+                    # idx = int(np.where(np.logical_and(yloc, xloc))[0])
+
+                    # placeholder for TI/stability influence on how far
+                    # wakes (and wake added TI) propagate downstream
+                    downstream_influence_length = 15 * turbine.rotor_diameter
 
                     if (
                         coord_ti.x1 > coord.x1
                         and np.abs(coord.x2 - coord_ti.x2) < 2 * turbine.rotor_diameter
+                        and coord_ti.x1 <= downstream_influence_length + coord.x1
                     ):
                         # only assess the effects of the current wake
 
-                        freestream_velocities = turbine_ti.calculate_swept_area_velocities(
-                            self.u_initial, coord_ti, rotated_x, rotated_y, rotated_z
-                        )
+                        # freestream_velocities = turbine_ti.calculate_swept_area_velocities(
+                        #     self.u_initial, coord_ti, rotated_x, rotated_y, rotated_z
+                        # )
 
-                        wake_velocities = turbine_ti.calculate_swept_area_velocities(
-                            self.u_initial - turb_u_wake,
+                        # wake_velocities = turbine_ti.calculate_swept_area_velocities(
+                        #     self.u_initial - turb_u_wake,
+                        #     coord_ti,
+                        #     rotated_x,
+                        #     rotated_y,
+                        #     rotated_z,
+                        # )
+
+                        area_overlap = self._calculate_overlap(
+                            turbine,
+                            turbine_ti,
                             coord_ti,
                             rotated_x,
                             rotated_y,
                             rotated_z,
+                            turb_u_wake,
                         )
 
-                        area_overlap = self._calculate_area_overlap(
-                            wake_velocities, freestream_velocities, turbine
-                        )
-
-                        # placeholder for TI/stability influence on how far
-                        # wakes (and wake added TI) propagate downstream
-                        downstream_influence_length = 15 * turbine.rotor_diameter
-
-                        if (
-                            area_overlap > 0.0
-                            and coord_ti.x1 <= downstream_influence_length + coord.x1
-                        ):
+                        if area_overlap > 0.0:
+                            idx = _find_overlap(rx, ry, coord_ti.x1, coord_ti.x2)
                             # Call wake turbulence model
                             # wake.turbulence_function(inputs)
                             ti_calculation = self._compute_turbine_wake_turbulence(
@@ -717,20 +841,13 @@ class FlowField:
                                 turbine,
                             )
                             # multiply by area overlap
-                            ti_added = area_overlap * ti_calculation
+                            ti_calculation *= area_overlap
 
                             # TODO: need to revisit when we are returning fields of TI
-                            turbine_ti.current_turbulence_intensity = np.max(
-                                (
-                                    np.sqrt(
-                                        ti_added ** 2
-                                        + self.wind_map.turbine_turbulence_intensity[
-                                            idx
-                                        ]
-                                        ** 2
-                                    ),
-                                    turbine_ti.current_turbulence_intensity,
-                                )
+                            turbine_ti.current_turbulence_intensity = _calculate_intensity(
+                                ti_calculation,
+                                self.wind_map.turbine_turbulence_intensity[idx],
+                                turbine_ti.current_turbulence_intensity,
                             )
 
                             if track_n_upstream_wakes:
