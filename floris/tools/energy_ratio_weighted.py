@@ -36,7 +36,7 @@ def _convert_to_numpy_array(series):
         return series
 
 
-def energy_ratio(df, df_w):
+def energy_ratio(df, df_w, weight_by_var=False):
 
     # Pull out the used bin values
     ws_bins = df_w.ws.values
@@ -52,8 +52,20 @@ def energy_ratio(df, df_w):
         return np.nan
 
     # If that check passes we can continue
-    df = df.groupby("ws").mean()
+    
+    # Compute mean of each bin 
+    if weight_by_var:
+        if ("ref_power_std" in df.columns) and \
+           ("test_power_std" in df.columns):
+            df = df.groupby("ws").apply(weighted_mean)
+        else:
+            print('Power standard deviation not provided in data. '+\
+                  'Resorting to using a simple mean.')
+            weight_by_var = False
 
+    if not weight_by_var:
+        df = df.groupby("ws").mean()
+    
     # Should now append frequency
     df["freq"] = df_w.set_index("ws").freq
 
@@ -64,7 +76,7 @@ def energy_ratio(df, df_w):
     return df.test_power.sum() / df.ref_power.sum()
 
 
-def energy_ratio_across_wind_dir(df, df_w, wd_bins):
+def energy_ratio_across_wind_dir(df, df_w, wd_bins, weight_by_var=False):
 
     # Recast wd into bins
     wd_bin_rad = (wd_bins[1] - wd_bins[0]) / 2.0
@@ -73,32 +85,54 @@ def energy_ratio_across_wind_dir(df, df_w, wd_bins):
     )
     df["wd"] = pd.cut(df.wd, wd_bin_edges, labels=wd_bins)
 
-    result = np.zeros_like(wd_bins)
+    result = np.zeros_like(wd_bins, dtype=float)
     for wd_idx, wd in enumerate(wd_bins):
-        result[wd_idx] = energy_ratio(df[df.wd == wd].drop("wd", axis=1), df_w)
+        result[wd_idx] = energy_ratio(df[df.wd == wd].drop("wd", axis=1), df_w, 
+                                      weight_by_var=weight_by_var)
     return np.array(result)
 
 
 def plot_mean_energy_ratio(
-    df_w, ref_power, test_power, ws_array, wd_array, wd_bins, color, label, ax
+    df_w, ref_power, test_power, ws_array, wd_array, wd_bins, color, label, ax,
+    weight_by_var=False, ref_power_std=None, test_power_std=None
 ):
 
     # Build the data frame
-    df = pd.DataFrame(
-        {
-            "ws": ws_array,
-            "wd": wd_array,
-            "ref_power": ref_power,
-            "test_power": test_power,
-        }
-    )
+    if (ref_power_std is not None) and (test_power_std is not None):
+        df = pd.DataFrame(
+            {
+                "ws": ws_array,
+                "wd": wd_array,
+                "ref_power": ref_power,
+                "test_power": test_power,
+                "ref_power_std": ref_power_std,
+                "test_power_std": ref_power_std,
+            }
+        )
+    else:
+        df = pd.DataFrame(
+            {
+                "ws": ws_array,
+                "wd": wd_array,
+                "ref_power": ref_power,
+                "test_power": test_power,
+            }
+        )
 
     # Round ws
     df["ws"] = df.ws.round()
 
     # Plot it
-    result = energy_ratio_across_wind_dir(df, df_w, wd_bins)
+    result = energy_ratio_across_wind_dir(df, df_w, wd_bins, 
+                                          weight_by_var=weight_by_var)
     ax.plot(wd_bins, result, "s-", color=color, label=label)
     ax.grid(True)
     ax.set_xlabel("Wind Direction (Deg)")
     ax.set_ylabel("Energy Ratio (-)")
+
+def weighted_mean(x):
+    result = {'ref_power': (1/sum(1/x.ref_power_std**2))*\
+                           sum(x.ref_power/x.ref_power_std**2),
+              'test_power': (1/sum(1/x.test_power_std**2))*\
+                            sum(x.test_power/x.test_power_std**2)}
+    return pd.Series(result)
