@@ -17,14 +17,14 @@ import pytest
 
 
 def turbines_to_array(turbine_list: list):
-    return [[t.Cp, t.Ct, t.power, t.aI, t.average_velocity] for t in turbine_list]
+    return [[t.Ct, t.power, t.aI, t.average_velocity] for t in turbine_list]
 
 
 def print_test_values(turbine_list: list):
     for t in turbine_list:
         print(
-            "({:.7f}, {:.7f}, {:.7f}, {:.7f}, {:.7f}),".format(
-                t.Cp, t.Ct, t.power, t.aI, t.average_velocity
+            "({:.7f}, {:.7f}, {:.7f}, {:.7f}),".format(
+                t.Ct, t.power, t.aI, t.average_velocity
             )
         )
 
